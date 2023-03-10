@@ -6,8 +6,9 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+chrono = {version = "0.4.23", features = ["serde"]}
 flate2 = "1.0.25"
-hyper = {version="0.14.24", features = ["full"] }
+hyper = {version = "0.14.24", features = ["full"] }
 hyper-tls = "0.5.0"
 scraper = "0.15.0"
 serde = { version = "1.0.154", features = ["derive"] }

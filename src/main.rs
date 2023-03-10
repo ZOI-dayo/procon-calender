@@ -1,6 +1,5 @@
 use std::{
     thread::sleep,
-    time::Duration,
     vec::Vec,
 };
 
@@ -9,14 +8,15 @@ use hyper::{
     Request,
     Body,
     body::HttpBody as _,
-    header::ACCEPT,
-Method,
+    Method,
 };
 use hyper_tls::HttpsConnector;
 
 use serde::{Deserialize, Serialize};
 
 use  flate2::bufread::GzDecoder;
+
+use chrono::{Utc, DateTime, Duration, TimeZone};
 
 #[tokio::main]
 async fn main() {
@@ -27,108 +27,131 @@ async fn main() {
         get_problems(&client).await;
         get_moja(&client).await;
 
-        sleep(Duration::from_secs(60));
+        sleep(std::time::Duration::from_secs(60));
     }
 }
 
+#[derive(Serialize, Deserialize, Debug)]
+    struct ProconContest {
+        id: String,
+        title: String,
+        begin: DateTime<Utc>,
+        end: DateTime<Utc>,
+        url: String,
+    }
+
+
 async fn get_problems(client: &Client<HttpsConnector<hyper::client::HttpConnector>>) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    /*
-       let json = client
-    // .get("https://kenkoooo.com/atcoder/internal-api/contest/recent")
-    .get("https://mojacoder.app/_next/data/gFS1O7T42djs1wRKmTHvP/ja/problems.json")
-    .header(reqwest::header::ACCEPT_ENCODING, "gzip, deflate, br")
-    .send()
-    .await
-    .unwrap()
-    .json::<HashMap<String, String>>()
-    .await
-    .unwrap();
-    return format!("{:?}", json);
-    */
-
-    // let client = hyper::Client::new();
-
-    // Parse an `http::Uri`...
-    // let uri = "https://kenkoooo.com/atcoder/internal-api/contest/recent".parse()?;
-    // let uri = "https://google.com/".parse()?;
-    // let uri = "https://kenkoooo.com/atcoder/internal-api/contest/recent".parse()?;
-    // let req = Request::builder().method("GET").uri(uri).header("accept", "gzip").body(()).unwrap();
     let req = Request::builder()
         .method(Method::GET)
         .uri("https://kenkoooo.com/atcoder/internal-api/contest/recent")
         .header("Accept-Encoding", "gzip")
-        // IF YOU DON'T INCLUDE THIS HEADER, ONLY THE FIRST PROPERTY OF THE STRUCT GETS RETURNED???
         .body(Body::from("")).unwrap();
-    // let mut resp = client.get(uri).header("allow", "gzip").build().await?;
-    // let mut resp = client.get(uri).header(ACCEPT ("gzip")).build().await?;
-    let mut resp_gzip = client.request(req).await?;
-    // let mut resp = send(req).await?;
+    let resp_gzip = client.request(req).await?;
     let data = hyper::body::to_bytes(resp_gzip.into_body())
         .await?
         .to_vec();
-    // println!("{}", type_of(&resp_gzip));
-    let resp = GzDecoder::new(&data[..]);
-    // println!("status={}", resp_gzip.status());
-
-    let mut result = std::io::read_to_string(resp).unwrap();
-    /*
-    while let Some(chunk) = resp_gzip.body_mut().data().await {
-        // stdout().write_all(&chunk?).await?;
-        result += &String::from_utf8((&chunk?).to_vec()).unwrap();
-    }
-    */
-    println!("{}", result);
+    let decoder = GzDecoder::new(&data[..]);
+    let resp = std::io::read_to_string(decoder).unwrap();
 
 #[derive(Serialize, Deserialize, Debug)]
-    struct Problem {
+    struct ProblemsProblem {
         id: String,
         title: String,
         start_epoch_second: i64,
+duration_second: i64,
     }
 
-    let deserialized_map: Vec<Problem> = serde_json::from_str(&result).unwrap();
-    println!("{:?}", deserialized_map);
-    fn type_of<T>(_: T) -> String{
-        let a = std::any::type_name::<T>();
-        return a.to_string();
-    }
-    println!("{}", type_of(&client));
+    let deserialized_map: Vec<ProblemsProblem> = serde_json::from_str(&resp).unwrap();
 
+    let mut contests: Vec<ProconContest> = Vec::new();
+    for p in deserialized_map {
+        let begin = Utc.timestamp(p.start_epoch_second, 0);
+        let url = format!("https://kenkoooo.com/atcoder#/contest/show/{}", p.id);
+        let contest = ProconContest {
+            id: format!("problems_{}", p.id),
+            title: p.title,
+            begin,
+            end: begin + Duration::seconds(p.duration_second),
+            url,
+        };
+        if (contest.end - Utc::now()).num_seconds() < 0 {
+            continue;
+        }
+        if (contest.end - Utc::now()).num_days() > 7 {
+            continue;
+        }
+    println!("{:?}", &contest);
+        contests.push(contest);
+    }
 
     Ok(())
 }
 
 
 async fn get_moja(client: &Client<HttpsConnector<hyper::client::HttpConnector>>) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    let uri = "https://mojacoder.app/_next/data/gFS1O7T42djs1wRKmTHvP/ja/problems.json".parse()?;
+    let uri = "https://mojacoder.app/_next/data/gFS1O7T42djs1wRKmTHvP/ja/contests.json".parse()?;
     let mut resp = client.get(uri).await?;
     let mut result = String::from("");
     while let Some(chunk) = resp.body_mut().data().await {
         result += &String::from_utf8((&chunk?).to_vec()).unwrap();
     }
-    println!("{}", result);
 
 #[derive(Serialize, Deserialize, Debug)]
-    struct Problem {
+    struct MojacoderUserDetail {
+        screenName: String,
+    }
+#[derive(Serialize, Deserialize, Debug)]
+    struct MojacoderUser {
+        detail: MojacoderUserDetail,
+    }
+#[derive(Serialize, Deserialize, Debug)]
+    struct MojacoderContest {
         id: String,
-        title: String,
-        datetime: String
+        slug: String,
+        name: String,
+        duration: i64,
+        startDatetime: String,
+        user: MojacoderUser,
     }
 #[derive(Serialize, Deserialize, Debug)]
-    struct PageProps {
-        newProblems: Vec<Problem>
+    struct MojacoderPageProps {
+        newContests: Vec<MojacoderContest>
     }
 #[derive(Serialize, Deserialize, Debug)]
-    struct Data {
-        pageProps: PageProps
+    struct MojacoderData {
+        pageProps: MojacoderPageProps
     }
 
-    let deserialized_map: Data = serde_json::from_str(&result).unwrap();
-    fn type_of<T>(_: T) -> String{
-        let a = std::any::type_name::<T>();
-        return a.to_string();
+    let deserialized_map: MojacoderData = serde_json::from_str(&result).unwrap();
+
+    let mut contests: Vec<ProconContest> = Vec::new();
+    for p in deserialized_map.pageProps.newContests {
+        let begin = DateTime::parse_from_rfc3339(&p.startDatetime).unwrap().with_timezone(&Utc);
+        let contest = ProconContest {
+            id: format!("mojacoder_{}", p.id),
+            title: p.name,
+            begin,
+            end: begin + Duration::seconds(p.duration),
+            url: format!("https://mojacoder.app/users/{}/contests/{}", p.user.detail.screenName, p.slug),
+        };
+        if (contest.end - Utc::now()).num_seconds() < 0 {
+            continue;
+        }
+        if (contest.end - Utc::now()).num_days() > 7 {
+            continue;
+        }
+    println!("{:?}", &contest);
+        contests.push(contest);
     }
 
 
     Ok(())
+}
+
+// Debug
+
+fn type_of<T>(_: T) -> String{
+    let a = std::any::type_name::<T>();
+    return a.to_string();
 }
