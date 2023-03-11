@@ -31,7 +31,8 @@ async fn main() {
         // problems
         get_problems(&client).await;
         get_moja(&client).await;
-        println!("{}", google_login(&client).await);
+
+        add_calender(&client, google_login(&client).await).await;
 
         // TODO: 1~2h?
         sleep(std::time::Duration::from_secs(60));
@@ -61,12 +62,12 @@ async fn get_problems(client: &Client<HttpsConnector<hyper::client::HttpConnecto
     let decoder = GzDecoder::new(&data[..]);
     let resp = std::io::read_to_string(decoder).unwrap();
 
-#[derive(Serialize, Deserialize, Debug)]
+    #[derive(Serialize, Deserialize, Debug)]
     struct ProblemsProblem {
         id: String,
         title: String,
         start_epoch_second: i64,
-duration_second: i64,
+        duration_second: i64,
     }
 
     let deserialized_map: Vec<ProblemsProblem> = serde_json::from_str(&resp).unwrap();
@@ -104,15 +105,15 @@ async fn get_moja(client: &Client<HttpsConnector<hyper::client::HttpConnector>>)
         result += &String::from_utf8((&chunk?).to_vec()).unwrap();
     }
 
-#[derive(Serialize, Deserialize, Debug)]
+    #[derive(Serialize, Deserialize, Debug)]
     struct MojacoderUserDetail {
         screenName: String,
     }
-#[derive(Serialize, Deserialize, Debug)]
+    #[derive(Serialize, Deserialize, Debug)]
     struct MojacoderUser {
         detail: MojacoderUserDetail,
     }
-#[derive(Serialize, Deserialize, Debug)]
+    #[derive(Serialize, Deserialize, Debug)]
     struct MojacoderContest {
         id: String,
         slug: String,
@@ -121,11 +122,11 @@ async fn get_moja(client: &Client<HttpsConnector<hyper::client::HttpConnector>>)
         startDatetime: String,
         user: MojacoderUser,
     }
-#[derive(Serialize, Deserialize, Debug)]
+    #[derive(Serialize, Deserialize, Debug)]
     struct MojacoderPageProps {
         newContests: Vec<MojacoderContest>
     }
-#[derive(Serialize, Deserialize, Debug)]
+    #[derive(Serialize, Deserialize, Debug)]
     struct MojacoderData {
         pageProps: MojacoderPageProps
     }
@@ -191,7 +192,7 @@ async fn google_login(client: &Client<HttpsConnector<hyper::client::HttpConnecto
     let my_claims =
         Claims {
             iss: google_credential.client_email,
-            scope: "https://www.googleapis.com/auth/spreadsheets".to_string(),
+            scope: "https://www.googleapis.com/auth/calendar".to_string(),
             aud: google_credential.token_uri,
             exp,
             iat,
@@ -221,11 +222,82 @@ async fn google_login(client: &Client<HttpsConnector<hyper::client::HttpConnecto
         access_token: String,
     }
 
+    println!("{}", result);
+
     let token_response_body: Token = serde_json::from_str(&result).unwrap();
 
     // let access_token = token_response_body.get("access_token").unwrap().as_str();
 
     return String::from(token_response_body.access_token);
+}
+
+async fn add_calender(client: &Client<HttpsConnector<hyper::client::HttpConnector>>, token: String) {
+    #[derive(Debug, Deserialize)]
+    struct GoogleCalenderInfo {
+        id: String
+    }
+    let google_calender_info: GoogleCalenderInfo = serde_json::from_reader(std::fs::File::open("secret/google_calender_info.json").unwrap()).unwrap();
+
+
+    let token_body = json!({
+        "start": {
+            "dateTime": "2023-03-13T17:00:00+09:00",
+            "timeZone": "Asia/Tokyo"
+        },
+        "end": {
+            "dateTime": "2023-03-13T18:50:00+09:00",
+            "timeZone": "Asia/Tokyo"
+        },
+        "summary": "title",
+        "description": "https://hoge.com\naaaaiiiiiuuuuu",
+        "location": "https://hoge.com"
+    });
+
+    #[derive(Debug, Deserialize)]
+    struct CalenderData {
+        items: Vec<CalenderEvent>,
+    }
+    #[derive(Debug, Deserialize)]
+    struct CalenderEvent {
+        id: String,
+        summary: String,
+        description: String,
+        location: String,
+        start: CalenderTime,
+        end: CalenderTime,
+    }
+    #[derive(Debug, Deserialize)]
+    struct CalenderTime {
+        dateTime: DateTime<Utc>,
+        timeZone: String,
+    }
+    let req = Request::builder()
+        .method(Method::GET)
+        .uri(format!("https://www.googleapis.com/calendar/v3/calendars/{}/events", google_calender_info.id))
+        .header("Authorization", format!("OAuth {}", token))
+        .body(Body::from("")).unwrap();
+    let mut resp = client.request(req).await.unwrap();
+    let mut result = String::new();
+    while let Some(chunk) = resp.body_mut().data().await {
+        result += &String::from_utf8((&chunk.unwrap()).to_vec()).unwrap();
+    }
+    println!("{}", result);
+    let calender_data: CalenderData = serde_json::from_str(&result).unwrap();
+    println!("{:?}", calender_data);
+
+    // TOOD: for contest in list: if it is not added to calender, add it to list.
+
+    let req = Request::builder()
+        .method(Method::POST)
+        .uri(format!("https://www.googleapis.com/calendar/v3/calendars/{}/events", google_calender_info.id))
+        .header("Authorization", format!("OAuth {}", token))
+        .body(Body::from(token_body.to_string())).unwrap();
+    let mut resp = client.request(req).await.unwrap();
+    let mut result = String::new();
+    while let Some(chunk) = resp.body_mut().data().await {
+        result += &String::from_utf8((&chunk.unwrap()).to_vec()).unwrap();
+    }
+    println!("{}", result);
 }
 
 // Debug
