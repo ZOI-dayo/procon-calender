@@ -12,7 +12,7 @@ use hyper::{
 };
 use hyper_tls::HttpsConnector;
 
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, de::DeserializeOwned, Serialize};
 
 use flate2::bufread::GzDecoder;
 
@@ -22,15 +22,18 @@ use serde_json::json;
 
 use jsonwebtoken::{encode, Header, Algorithm, EncodingKey};
 
+mod http_helper;
+use http_helper::HttpHelper;
 
 #[tokio::main]
 async fn main() {
     let https = HttpsConnector::new();
     let client = Client::builder().build::<_, hyper::Body>(https);
+    let http_helper = HttpHelper::new();
     loop {
         // problems
-        get_problems(&client).await;
-        get_moja(&client).await;
+        get_problems(&http_helper/*&client*/).await;
+        get_moja(&http_helper/*&client*/).await;
 
         add_calender(&client, google_login(&client).await).await;
 
@@ -39,7 +42,7 @@ async fn main() {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+    #[derive(Serialize, Deserialize, Debug)]
     struct ProconContest {
         id: String,
         title: String,
@@ -49,19 +52,7 @@ async fn main() {
     }
 
 
-async fn get_problems(client: &Client<HttpsConnector<hyper::client::HttpConnector>>) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    let req = Request::builder()
-        .method(Method::GET)
-        .uri("https://kenkoooo.com/atcoder/internal-api/contest/recent")
-        .header("Accept-Encoding", "gzip")
-        .body(Body::from("")).unwrap();
-    let resp_gzip = client.request(req).await?;
-    let data = hyper::body::to_bytes(resp_gzip.into_body())
-        .await?
-        .to_vec();
-    let decoder = GzDecoder::new(&data[..]);
-    let resp = std::io::read_to_string(decoder).unwrap();
-
+async fn get_problems(http_helper: &HttpHelper/*client: &Client<HttpsConnector<hyper::client::HttpConnector>>*/) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     #[derive(Serialize, Deserialize, Debug)]
     struct ProblemsProblem {
         id: String,
@@ -69,11 +60,9 @@ async fn get_problems(client: &Client<HttpsConnector<hyper::client::HttpConnecto
         start_epoch_second: i64,
         duration_second: i64,
     }
-
-    let deserialized_map: Vec<ProblemsProblem> = serde_json::from_str(&resp).unwrap();
-
+    let data = http_helper.get_gzip::<Vec<ProblemsProblem>>("https://kenkoooo.com/atcoder/internal-api/contest/recent").await;
     let mut contests: Vec<ProconContest> = Vec::new();
-    for p in deserialized_map {
+    for p in data {
         let begin = Utc.timestamp(p.start_epoch_second, 0);
         let url = format!("https://kenkoooo.com/atcoder#/contest/show/{}", p.id);
         let contest = ProconContest {
@@ -97,14 +86,7 @@ async fn get_problems(client: &Client<HttpsConnector<hyper::client::HttpConnecto
 }
 
 
-async fn get_moja(client: &Client<HttpsConnector<hyper::client::HttpConnector>>) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    let uri = "https://mojacoder.app/_next/data/gFS1O7T42djs1wRKmTHvP/ja/contests.json".parse()?;
-    let mut resp = client.get(uri).await?;
-    let mut result = String::from("");
-    while let Some(chunk) = resp.body_mut().data().await {
-        result += &String::from_utf8((&chunk?).to_vec()).unwrap();
-    }
-
+async fn get_moja(http_helper: &HttpHelper/*client: &Client<HttpsConnector<hyper::client::HttpConnector>>*/) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     #[derive(Serialize, Deserialize, Debug)]
     struct MojacoderUserDetail {
         screenName: String,
@@ -131,10 +113,11 @@ async fn get_moja(client: &Client<HttpsConnector<hyper::client::HttpConnector>>)
         pageProps: MojacoderPageProps
     }
 
-    let deserialized_map: MojacoderData = serde_json::from_str(&result).unwrap();
+    // TODO: リンク変わるのどうにかする
+    let data = http_helper.get::<MojacoderData>("https://mojacoder.app/_next/data/zQ2R1boaeCCvdUgvPtmUh/ja/contests.json").await;
 
     let mut contests: Vec<ProconContest> = Vec::new();
-    for p in deserialized_map.pageProps.newContests {
+    for p in data.pageProps.newContests {
         let begin = DateTime::parse_from_rfc3339(&p.startDatetime).unwrap().with_timezone(&Utc);
         let contest = ProconContest {
             id: format!("mojacoder_{}", p.id),
