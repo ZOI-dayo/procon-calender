@@ -25,17 +25,43 @@ use jsonwebtoken::{encode, Header, Algorithm, EncodingKey};
 mod http_helper;
 use http_helper::HttpHelper;
 
+mod google_calender;
+use google_calender::GoogleCalender;
+use google_calender::{CalenderEvent, CalenderTime};
+
+use regex::Regex;
+
 #[tokio::main]
 async fn main() {
     let https = HttpsConnector::new();
     let client = Client::builder().build::<_, hyper::Body>(https);
     let http_helper = HttpHelper::new();
+    let google_calender = GoogleCalender::new().await;
     loop {
-        // problems
-        get_problems(&http_helper/*&client*/).await;
-        get_moja(&http_helper/*&client*/).await;
+        let mut contests: Vec<ProconContest> = vec![];
 
-        add_calender(&client, google_login(&client).await).await;
+        contests.append(get_problems(&http_helper/*&client*/).await.as_mut());
+        contests.append(get_moja(&http_helper/*&client*/).await.as_mut());
+
+        // add_calender(&client, google_login(&client).await).await;
+        let events = google_calender.get_events().await;
+        let mut new_contests: Vec<ProconContest> = vec![];
+        for c in contests {
+            let event: CalenderEvent = CalenderEvent {
+                summary: c.title.clone(),
+                description: String::new(),
+                location: c.url.clone(),
+                begin: CalenderTime{ dateTime:c.begin, timeZone: String::from("Asia/Tokyo") },
+                end: CalenderTime{ dateTime:c.end, timeZone: String::from("Asia/Tokyo") },
+            };
+            if !&events.contains(&event) {
+                new_contests.push(c);
+            }
+        }
+
+        for c in new_contests {
+            google_calender.add_event(c.title, String::new(), c.url, c.begin, c.end).await;
+        }
 
         // TODO: 1~2h?
         sleep(std::time::Duration::from_secs(60));
@@ -52,7 +78,7 @@ async fn main() {
     }
 
 
-async fn get_problems(http_helper: &HttpHelper/*client: &Client<HttpsConnector<hyper::client::HttpConnector>>*/) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+async fn get_problems(http_helper: &HttpHelper/*client: &Client<HttpsConnector<hyper::client::HttpConnector>>*/) -> Vec<ProconContest> {
     #[derive(Serialize, Deserialize, Debug)]
     struct ProblemsProblem {
         id: String,
@@ -60,7 +86,7 @@ async fn get_problems(http_helper: &HttpHelper/*client: &Client<HttpsConnector<h
         start_epoch_second: i64,
         duration_second: i64,
     }
-    let data = http_helper.get_gzip::<Vec<ProblemsProblem>>("https://kenkoooo.com/atcoder/internal-api/contest/recent").await;
+    let data = http_helper.get_json_gzip::<Vec<ProblemsProblem>>("https://kenkoooo.com/atcoder/internal-api/contest/recent").await;
     let mut contests: Vec<ProconContest> = Vec::new();
     for p in data {
         let begin = Utc.timestamp(p.start_epoch_second, 0);
@@ -82,11 +108,11 @@ async fn get_problems(http_helper: &HttpHelper/*client: &Client<HttpsConnector<h
         contests.push(contest);
     }
 
-    Ok(())
+    return contests;
 }
 
 
-async fn get_moja(http_helper: &HttpHelper/*client: &Client<HttpsConnector<hyper::client::HttpConnector>>*/) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+async fn get_moja(http_helper: &HttpHelper/*client: &Client<HttpsConnector<hyper::client::HttpConnector>>*/) -> Vec<ProconContest> {
     #[derive(Serialize, Deserialize, Debug)]
     struct MojacoderUserDetail {
         screenName: String,
@@ -114,10 +140,25 @@ async fn get_moja(http_helper: &HttpHelper/*client: &Client<HttpsConnector<hyper
     }
 
     // TODO: リンク変わるのどうにかする
-    let data = http_helper.get::<MojacoderData>("https://mojacoder.app/_next/data/zQ2R1boaeCCvdUgvPtmUh/ja/contests.json").await;
+    // let data = http_helper.get_json::<MojacoderData>("https://mojacoder.app/_next/data/zQ2R1boaeCCvdUgvPtmUh/ja/contests.json").await;
+    let mut data = vec![];
+    let html = http_helper.get("https://mojacoder.app/contests").await;
+let re = Regex::new("<script id=\"__NEXT_DATA__\" type=\"application/json\">\\{\"props\":\\{\"pageProps\":\\{\"newContests\":(.*)},\"__N_SSG\":true\\},\"page\":\"/contests\",\"query\":\\{\\},\"buildId\":\".*\",\"runtimeConfig\":\\{\\},\"isFallback\":false,\"gsp\":true,\"locale\":\"ja\",\"locales\":\\[\"ja\",\"en\"\\],\"defaultLocale\":\"ja\",\"scriptLoader\":\\[\\]\\}</script>").unwrap();
+match re.captures(&html) {
+    Some(caps) => {
+        println!("data: {}", &caps[1]);
+        data = HttpHelper::to_json::<Vec<MojacoderContest>>((&caps[1]).to_string());
+    }
+    None => println!("Not found"),
+}
+println!("{:?}", data);
+/*
+   for m in re.find_iter(&html) {
+    println!("Found `{}` at {}-{}", m.as_str(), m.start(), m.end());
+}*/
 
     let mut contests: Vec<ProconContest> = Vec::new();
-    for p in data.pageProps.newContests {
+    for p in data {
         let begin = DateTime::parse_from_rfc3339(&p.startDatetime).unwrap().with_timezone(&Utc);
         let contest = ProconContest {
             id: format!("mojacoder_{}", p.id),
@@ -136,10 +177,9 @@ async fn get_moja(http_helper: &HttpHelper/*client: &Client<HttpsConnector<hyper
         contests.push(contest);
     }
 
-
-    Ok(())
+    return contests;
 }
-
+/*
 async fn google_login(client: &Client<HttpsConnector<hyper::client::HttpConnector>>) -> String {
     #[derive(Debug, Deserialize)]
     struct GoogleCredential {
@@ -213,7 +253,8 @@ async fn google_login(client: &Client<HttpsConnector<hyper::client::HttpConnecto
 
     return String::from(token_response_body.access_token);
 }
-
+*/
+/*
 async fn add_calender(client: &Client<HttpsConnector<hyper::client::HttpConnector>>, token: String) {
     #[derive(Debug, Deserialize)]
     struct GoogleCalenderInfo {
@@ -283,6 +324,7 @@ async fn add_calender(client: &Client<HttpsConnector<hyper::client::HttpConnecto
     println!("{}", result);
 }
 
+*/
 // Debug
 
 fn type_of<T>(_: T) -> String{
