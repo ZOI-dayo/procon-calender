@@ -37,15 +37,15 @@ pub struct GoogleCalenderInfo {
 pub struct CalenderEvent {
     // id: String,
     pub summary: String,
-    pub description: String,
+    pub description: Option<String>,
     pub location: String,
-    pub begin: CalenderTime,
+    pub start: CalenderTime,
     pub end: CalenderTime,
 }
 impl PartialEq for CalenderEvent {
     fn eq(&self, other: &Self) -> bool {
         self.summary == other.summary
-            && self.begin.dateTime == other.begin.dateTime
+            && self.start.dateTime == other.start.dateTime
             && self.end.dateTime == other.end.dateTime
     }
 }

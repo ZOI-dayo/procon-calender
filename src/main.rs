@@ -49,9 +49,9 @@ async fn main() {
         for c in contests {
             let event: CalenderEvent = CalenderEvent {
                 summary: c.title.clone(),
-                description: String::new(),
+                description: None,
                 location: c.url.clone(),
-                begin: CalenderTime{ dateTime:c.begin, timeZone: String::from("Asia/Tokyo") },
+                start: CalenderTime{ dateTime:c.begin, timeZone: String::from("Asia/Tokyo") },
                 end: CalenderTime{ dateTime:c.end, timeZone: String::from("Asia/Tokyo") },
             };
             if !&events.contains(&event) {
@@ -64,7 +64,7 @@ async fn main() {
         }
 
         // TODO: 1~2h?
-        sleep(std::time::Duration::from_secs(60));
+        sleep(std::time::Duration::from_secs(60*60));
     }
 }
 
