@@ -7,9 +7,7 @@ use std::{
 use hyper::{
     Client,
     Request,
-    Response,
     Body,
-    body::HttpBody as _,
     Method,
     header::HeaderValue,
 };
@@ -18,13 +16,6 @@ use hyper_tls::HttpsConnector;
 use serde::{de::DeserializeOwned};
 
 use flate2::bufread::GzDecoder;
-
-use chrono::{Utc, DateTime, Duration, TimeZone};
-
-use serde_json::json;
-
-use jsonwebtoken::{encode, Header, Algorithm, EncodingKey};
-
 
 
 pub struct HttpHelper {
