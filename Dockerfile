@@ -1,9 +1,6 @@
 FROM rust:slim-buster AS builder
 
 WORKDIR /prod
-COPY Cargo.toml .
-RUN mkdir .cargo
-RUN cargo vendor > .cargo/config
 COPY . .
 RUN cargo build --release
 
