@@ -4,7 +4,7 @@ WORKDIR /prod
 COPY Cargo.toml .
 RUN mkdir ~/.cargo
 RUN touch ~/.cargo/config
-RUN cargo vendor > ~/.cargo/config
+RUN echo -e "[net]\ngit-fetch-with-cli = true" > ~/.cargo/config
 COPY . .
 RUN cargo build --release
 
