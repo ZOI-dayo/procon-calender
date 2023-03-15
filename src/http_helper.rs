@@ -1,5 +1,4 @@
 use std::{
-    thread::sleep,
     vec::Vec,
     collections::HashMap,
 };
@@ -13,7 +12,7 @@ use hyper::{
 };
 use hyper_tls::HttpsConnector;
 
-use serde::{de::DeserializeOwned};
+use serde::de::DeserializeOwned;
 
 use flate2::bufread::GzDecoder;
 

@@ -1,25 +1,11 @@
 use std::{
-    thread::sleep,
     vec::Vec,
     collections::HashMap,
 };
 
-use hyper::{
-    Client,
-    Request,
-    Response,
-    Body,
-    body::HttpBody as _,
-    Method,
-    header::HeaderValue,
-};
-use hyper_tls::HttpsConnector;
+use serde::{Deserialize, Serialize};
 
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
-
-use flate2::bufread::GzDecoder;
-
-use chrono::{Utc, DateTime, Duration, TimeZone};
+use chrono::{Utc, DateTime, Duration};
 
 use serde_json::json;
 

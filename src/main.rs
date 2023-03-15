@@ -83,13 +83,13 @@ async fn get_problems(http_helper: &HttpHelper) -> Vec<ProconContest> {
         if (contest.end - Utc::now()).num_seconds() < 0 {
             continue;
         }
-        if (contest.end - Utc::now()).num_days() > 7 {
+        if (contest.end - Utc::now()).num_days() > 30 {
             continue;
         }
-        if (contest.end - contest.begin).num_days() > 2 {
+        if (contest.end - contest.begin).num_days() > 1 {
             continue;
         }
-    println!("{:?}", &contest);
+        println!("adding contest from Problems : {}", &contest.title);
         contests.push(contest);
     }
 
@@ -148,10 +148,13 @@ println!("{:?}", data);
         if (contest.end - Utc::now()).num_seconds() < 0 {
             continue;
         }
-        if (contest.end - Utc::now()).num_days() > 7 {
+        if (contest.end - Utc::now()).num_days() > 30 {
             continue;
         }
-    println!("{:?}", &contest);
+        if (contest.end - contest.begin).num_days() > 1 {
+            continue;
+        }
+        println!("adding contest from Moja : {}", &contest.title);
         contests.push(contest);
     }
 
