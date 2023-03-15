@@ -19,7 +19,7 @@ use regex::Regex;
 #[tokio::main]
 async fn main() {
     let http_helper = HttpHelper::new();
-    let google_calender = GoogleCalender::new().await;
+    let mut google_calender = GoogleCalender::new().await;
     loop {
         let mut contests: Vec<ProconContest> = vec![];
 
@@ -33,8 +33,8 @@ async fn main() {
                 summary: c.title.clone(),
                 description: None,
                 location: c.url.clone(),
-                start: CalenderTime{ dateTime:c.begin, timeZone: String::from("Asia/Tokyo") },
-                end: CalenderTime{ dateTime:c.end, timeZone: String::from("Asia/Tokyo") },
+                start: CalenderTime{ date_time:c.begin, time_zone: String::from("Asia/Tokyo") },
+                end: CalenderTime{ date_time:c.end, time_zone: String::from("Asia/Tokyo") },
             };
             if !&events.contains(&event) {
                 new_contests.push(c);
@@ -71,7 +71,7 @@ async fn get_problems(http_helper: &HttpHelper) -> Vec<ProconContest> {
     let data = http_helper.get_json_gzip::<Vec<ProblemsProblem>>("https://kenkoooo.com/atcoder/internal-api/contest/recent").await;
     let mut contests: Vec<ProconContest> = Vec::new();
     for p in data {
-        let begin = Utc.timestamp(p.start_epoch_second, 0);
+        let begin = Utc.timestamp_opt(p.start_epoch_second, 0).unwrap();
         let url = format!("https://kenkoooo.com/atcoder#/contest/show/{}", p.id);
         let contest = ProconContest {
             id: format!("problems_{}", p.id),
@@ -100,7 +100,8 @@ async fn get_problems(http_helper: &HttpHelper) -> Vec<ProconContest> {
 async fn get_moja(http_helper: &HttpHelper) -> Vec<ProconContest> {
     #[derive(Serialize, Deserialize, Debug)]
     struct MojacoderUserDetail {
-        screenName: String,
+        #[serde(rename = "screenName")]
+        screen_name: String,
     }
     #[derive(Serialize, Deserialize, Debug)]
     struct MojacoderUser {
@@ -112,16 +113,19 @@ async fn get_moja(http_helper: &HttpHelper) -> Vec<ProconContest> {
         slug: String,
         name: String,
         duration: i64,
-        startDatetime: String,
+        #[serde(rename = "startDatetime")]
+        start_datetime: String,
         user: MojacoderUser,
     }
     #[derive(Serialize, Deserialize, Debug)]
     struct MojacoderPageProps {
-        newContests: Vec<MojacoderContest>
+        #[serde(rename = "newContests")]
+        new_contests: Vec<MojacoderContest>
     }
     #[derive(Serialize, Deserialize, Debug)]
     struct MojacoderData {
-        pageProps: MojacoderPageProps
+        #[serde(rename = "pageProps")]
+        page_props: MojacoderPageProps
     }
 
     let mut data = vec![];
@@ -137,13 +141,13 @@ match re.captures(&html) {
 println!("{:?}", data);
     let mut contests: Vec<ProconContest> = Vec::new();
     for p in data {
-        let begin = DateTime::parse_from_rfc3339(&p.startDatetime).unwrap().with_timezone(&Utc);
+        let begin = DateTime::parse_from_rfc3339(&p.start_datetime).unwrap().with_timezone(&Utc);
         let contest = ProconContest {
             id: format!("mojacoder_{}", p.id),
             title: p.name,
             begin,
             end: begin + Duration::seconds(p.duration),
-            url: format!("https://mojacoder.app/users/{}/contests/{}", p.user.detail.screenName, p.slug),
+            url: format!("https://mojacoder.app/users/{}/contests/{}", p.user.detail.screen_name, p.slug),
         };
         if (contest.end - Utc::now()).num_seconds() < 0 {
             continue;
@@ -162,8 +166,9 @@ println!("{:?}", data);
 }
 
 // Debug
-
+/*
 fn type_of<T>(_: T) -> String{
     let a = std::any::type_name::<T>();
     return a.to_string();
 }
+*/

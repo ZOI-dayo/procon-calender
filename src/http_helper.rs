@@ -61,13 +61,14 @@ impl HttpHelper {
             return text;
         }
 
-
+/*
     pub async fn get_json<T>(&self, url: &str) -> T
         where
             T: DeserializeOwned,
         {
             return HttpHelper::to_json::<T>(self.get(url).await);
         }
+*/
 
     pub async fn get_json_with_header<T>(&self, url: &str, headers: HashMap<String, String>) -> T
         where
@@ -102,14 +103,14 @@ impl HttpHelper {
             return text;
         }
 
-
+/*
     pub async fn post_json_with_header<T>(&self, url: &str, body: String, content_type: &str, headers: HashMap<String, String>) -> T
         where
             T: DeserializeOwned,
         {
             return HttpHelper::to_json::<T>(self.post_with_header(url, body, content_type, headers).await);
         }
-
+*/
 
 
 }

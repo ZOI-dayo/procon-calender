@@ -11,13 +11,11 @@ use serde_json::json;
 
 use jsonwebtoken::{encode, Header, Algorithm, EncodingKey};
 
-
-
 use crate::http_helper::HttpHelper;
 
 #[derive(Debug, Deserialize)]
 pub struct GoogleCalenderInfo {
-    id: String
+    id: String,
 }
 #[derive(Debug, Deserialize)]
 pub struct CalenderEvent {
@@ -31,20 +29,23 @@ pub struct CalenderEvent {
 impl PartialEq for CalenderEvent {
     fn eq(&self, other: &Self) -> bool {
         self.summary == other.summary
-            && self.start.dateTime == other.start.dateTime
-            && self.end.dateTime == other.end.dateTime
+            && self.start.date_time == other.start.date_time
+            && self.end.date_time == other.end.date_time
     }
 }
 #[derive(Debug, Deserialize)]
 pub struct CalenderTime {
-    pub dateTime: DateTime<Utc>,
-    pub timeZone: String,
+    #[serde(rename = "dateTime")]
+    pub date_time: DateTime<Utc>,
+    #[serde(rename = "timeZone")]
+    pub time_zone: String,
 }
 
 
 pub struct GoogleCalender {
     http_helper: HttpHelper,
     cached_token: Option<String>,
+    token_exp: i64,
     info: GoogleCalenderInfo,
 }
 
@@ -54,26 +55,29 @@ impl GoogleCalender {
         GoogleCalender {
             http_helper: HttpHelper::new(),
             cached_token: None,
+            token_exp: 0,
             info,
         }
     }
-    async fn get_token(&self) -> String {
+    async fn get_token(&mut self) -> String {
         // TODO: 期限切れてたら再生成
         if self.cached_token.is_some() {
-            return self.cached_token.as_ref().unwrap().to_string();
+            if self.token_exp > Utc::now().timestamp() + 60 {
+                return self.cached_token.as_ref().unwrap().to_string();
+            }
         }
         #[derive(Debug, Deserialize)]
         struct GoogleCredential {
-            r#type: String,
-            project_id: String,
-            private_key_id: String,
+            // r#type: String,
+            // project_id: String,
+            // private_key_id: String,
             private_key: String,
             client_email: String,
-            client_id: String,
-            auth_uri: String,
+            // client_id: String,
+            // auth_uri: String,
             token_uri: String,
-            auth_provider_x509_cert_url: String,
-            client_x509_cert_url: String,
+            // auth_provider_x509_cert_url: String,
+            // client_x509_cert_url: String,
         }
         let google_credential: GoogleCredential = serde_json::from_reader(std::fs::File::open("secret/google_credential.json").unwrap()).unwrap();
 
@@ -115,36 +119,31 @@ impl GoogleCalender {
         }
 
         let token_response_body = HttpHelper::to_json::<Token>(self.http_helper.post(&my_claims.aud, token_body.to_string(), "application/json").await);
+        self.cache_token(token_response_body.access_token.clone(), exp);
         return token_response_body.access_token;
     }
 
-    pub async fn get_events(&self) -> Vec<CalenderEvent> {
-        let token_body = json!({
-            "start": {
-                "dateTime": "2023-03-13T17:00:00+09:00",
-                "timeZone": "Asia/Tokyo"
-            },
-            "end": {
-                "dateTime": "2023-03-13T18:50:00+09:00",
-                "timeZone": "Asia/Tokyo"
-            },
-            "summary": "title",
-            "description": "https://hoge.com\naaaaiiiiiuuuuu",
-            "location": "https://hoge.com"
-        });
+    fn cache_token(&mut self, token: String, exp: i64) {
+        self.token_exp = exp;
+        self.cached_token = Some(token);
+    }
 
+    pub async fn get_events(&mut self) -> Vec<CalenderEvent> {
         #[derive(Debug, Deserialize)]
         struct CalenderData {
             items: Vec<CalenderEvent>,
         }
+
+        let token = self.get_token().await;
+
         let calender_data = self.http_helper.get_json_with_header::<CalenderData>(
             &format!("https://www.googleapis.com/calendar/v3/calendars/{}/events", self.info.id),
-            HashMap::from([(String::from("Authorization"), String::from(format!("OAuth {}", self.get_token().await)))])
+            HashMap::from([(String::from("Authorization"), String::from(format!("OAuth {}", token)))])
             ).await;
         return calender_data.items;
     }
 
-    pub async fn add_event(&self, title: String, description: String, location: String, start: DateTime<Utc>, end: DateTime<Utc>) {
+    pub async fn add_event(&mut self, title: String, description: String, location: String, start: DateTime<Utc>, end: DateTime<Utc>) {
         println!("{}", start.to_string());
         let token_body = json!({
             "start": {
@@ -162,11 +161,13 @@ impl GoogleCalender {
 
         // TOOD: for contest in list: if it is not added to calender, add it to list.
 
+        let token = self.get_token().await;
+
          let response = self.http_helper.post_with_header(
             &format!("https://www.googleapis.com/calendar/v3/calendars/{}/events", self.info.id),
             token_body.to_string(),
             "application/json",
-            HashMap::from([(String::from("Authorization"), String::from(format!("OAuth {}", self.get_token().await)))])
+            HashMap::from([(String::from("Authorization"), String::from(format!("OAuth {}", token)))])
             ).await;
 
         println!("Add Event: {}", response);
