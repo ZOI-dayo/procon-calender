@@ -3,7 +3,7 @@ FROM rust:slim-buster AS builder
 WORKDIR /prod
 COPY Cargo.toml .
 RUN mkdir ~/.cargo
-RUN touch ~/.catgo/config
+RUN touch ~/.cargo/config
 RUN cargo vendor > ~/.cargo/config
 COPY . .
 RUN cargo build --release
