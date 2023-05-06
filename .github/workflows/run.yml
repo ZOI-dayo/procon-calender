@@ -20,8 +20,6 @@ jobs:
     steps:
     - uses: actions/checkout@v3
     - name: setup secrets
-      run: mkdir secrets && echo "${{secrets.GOOGLE_CALENDER_INFO}}" > secrets/google_calender_info.json && echo "${{secrets.GOOGLE_CREDENTIAL}}" > secrets/google_credential.json
-    - name: check
-      run: ls ./ && echo "---" && ls ./secrets/
+      run: mkdir secret && echo "${{secrets.GOOGLE_CALENDER_INFO}}" > secret/google_calender_info.json && echo "${{secrets.GOOGLE_CREDENTIAL}}" > secret/google_credential.json
     - name: Run
       run: ./run.sh
