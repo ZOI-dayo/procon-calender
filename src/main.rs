@@ -20,34 +20,31 @@ use regex::Regex;
 async fn main() {
     let http_helper = HttpHelper::new();
     let mut google_calender = GoogleCalender::new().await;
-    loop {
-        let mut contests: Vec<ProconContest> = vec![];
 
-        contests.append(get_problems(&http_helper).await.as_mut());
-        contests.append(get_moja(&http_helper).await.as_mut());
+    let mut contests: Vec<ProconContest> = vec![];
 
-        let events = google_calender.get_events().await;
-        let mut new_contests: Vec<ProconContest> = vec![];
-        for c in contests {
-            let event: CalenderEvent = CalenderEvent {
-                summary: c.title.clone(),
-                description: None,
-                location: c.url.clone(),
-                start: CalenderTime{ date_time:c.begin, time_zone: String::from("Asia/Tokyo") },
-                end: CalenderTime{ date_time:c.end, time_zone: String::from("Asia/Tokyo") },
-            };
-            if !&events.contains(&event) {
-                new_contests.push(c);
-            }
+    contests.append(get_problems(&http_helper).await.as_mut());
+    contests.append(get_moja(&http_helper).await.as_mut());
+
+    let events = google_calender.get_events().await;
+    let mut new_contests: Vec<ProconContest> = vec![];
+    for c in contests {
+        let event: CalenderEvent = CalenderEvent {
+            summary: c.title.clone(),
+            description: None,
+            location: c.url.clone(),
+            start: CalenderTime{ date_time:c.begin, time_zone: String::from("Asia/Tokyo") },
+            end: CalenderTime{ date_time:c.end, time_zone: String::from("Asia/Tokyo") },
+        };
+        if !&events.contains(&event) {
+            new_contests.push(c);
         }
-
-        for c in new_contests {
-            google_calender.add_event(c.title, String::new(), c.url, c.begin, c.end).await;
-        }
-
-        // TODO: 1~2h?
-        sleep(std::time::Duration::from_secs(60*60));
     }
+
+    for c in new_contests {
+        google_calender.add_event(c.title, String::new(), c.url, c.begin, c.end).await;
+    }
+
 }
 
     #[derive(Serialize, Deserialize, Debug)]
