@@ -20,7 +20,7 @@ jobs:
     steps:
     - uses: actions/checkout@v3
     - name: setup secrets
-      run: mkdir secret && echo "${{secrets.GOOGLE_CALENDER_INFO}}" > secret/google_calender_info.json && echo "${{secrets.GOOGLE_CREDENTIAL}}" > secret/google_credential.json
+      run: mkdir secret && echo "${{secrets.GOOGLE_CALENDER_INFO}}" | base64 -d > secret/google_calender_info.json && echo "${{secrets.GOOGLE_CREDENTIAL}}" | base64 -d > secret/google_credential.json
     - name: check size
       run: ls -al secret/
     - name: Run
