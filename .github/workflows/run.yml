@@ -6,7 +6,7 @@ on:
   pull_request:
     branches: [ "main" ]
   schedule:
-    - cron: '0 0/1 * * *'
+    - cron: '0 0/3 * * *'
   workflow_dispatch:
 
 env:
@@ -19,6 +19,13 @@ jobs:
 
     steps:
     - uses: actions/checkout@v3
+    - uses: actions/cache@v2
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          target
+        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
     - name: setup secrets
       run: mkdir secret && echo "${{secrets.GOOGLE_CALENDER_INFO}}" | base64 -d > secret/google_calender_info.json && echo "${{secrets.GOOGLE_CREDENTIAL}}" | base64 -d > secret/google_credential.json
     - name: check size
