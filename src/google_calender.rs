@@ -137,14 +137,14 @@ impl GoogleCalender {
         let token = self.get_token().await;
 
         let calender_data = self.http_helper.get_json_with_header::<CalenderData>(
-            &format!("https://www.googleapis.com/calendar/v3/calendars/{}/events", self.info.id),
+            &format!("https://www.googleapis.com/calendar/v3/calendars/{}/events?singleEvents=true&maxResults=2500&orderBy=startTime&timeMin={}", self.info.id, Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, true)),
             HashMap::from([(String::from("Authorization"), String::from(format!("OAuth {}", token)))])
             ).await;
         return calender_data.items;
     }
 
     pub async fn add_event(&mut self, title: String, description: String, location: String, start: DateTime<Utc>, end: DateTime<Utc>) {
-        println!("{}", start.to_string());
+        // println!("{}", start.to_string());
         let token_body = json!({
             "start": {
                 "dateTime": start.to_rfc3339(),

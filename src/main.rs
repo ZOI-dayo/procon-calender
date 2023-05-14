@@ -26,17 +26,12 @@ async fn main() {
     contests.append(get_problems(&http_helper).await.as_mut());
     contests.append(get_moja(&http_helper).await.as_mut());
 
-    let events = google_calender.get_events().await;
+    let events = google_calender.get_events().await.iter().clone().map(|e| {e.location.clone()}).collect::<Vec<_>>();
     let mut new_contests: Vec<ProconContest> = vec![];
+    // println!("{:?}", events.len());
     for c in contests {
-        let event: CalenderEvent = CalenderEvent {
-            summary: c.title.clone(),
-            description: None,
-            location: c.url.clone(),
-            start: CalenderTime{ date_time:c.begin, time_zone: String::from("Asia/Tokyo") },
-            end: CalenderTime{ date_time:c.end, time_zone: String::from("Asia/Tokyo") },
-        };
-        if !&events.contains(&event) {
+        if !events.iter().any(|e| {e == &c.url.clone()}) {
+            // println!("{:?}", c.url.clone());
             new_contests.push(c);
         }
     }
@@ -130,12 +125,12 @@ async fn get_moja(http_helper: &HttpHelper) -> Vec<ProconContest> {
 let re = Regex::new("<script id=\"__NEXT_DATA__\" type=\"application/json\">\\{\"props\":\\{\"pageProps\":\\{\"newContests\":(.*)},\"__N_SSG\":true\\},\"page\":\"/contests\",\"query\":\\{\\},\"buildId\":\".*\",\"runtimeConfig\":\\{\\},\"isFallback\":false,\"gsp\":true,\"locale\":\"ja\",\"locales\":\\[\"ja\",\"en\"\\],\"defaultLocale\":\"ja\",\"scriptLoader\":\\[\\]\\}</script>").unwrap();
 match re.captures(&html) {
     Some(caps) => {
-        println!("data: {}", &caps[1]);
+        // println!("data: {}", &caps[1]);
         data = HttpHelper::to_json::<Vec<MojacoderContest>>((&caps[1]).to_string());
     }
     None => println!("Not found"),
 }
-println!("{:?}", data);
+// println!("{:?}", data);
     let mut contests: Vec<ProconContest> = Vec::new();
     for p in data {
         let begin = DateTime::parse_from_rfc3339(&p.start_datetime).unwrap().with_timezone(&Utc);

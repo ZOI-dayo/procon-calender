@@ -43,7 +43,7 @@ impl HttpHelper {
         where
             T: DeserializeOwned,
         {
-            println!("{}", data);
+            // println!("data: {}", data);
             return serde_json::from_reader(data.as_bytes()).unwrap();
         }
 
